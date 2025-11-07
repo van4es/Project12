@@ -1,11 +1,14 @@
-﻿using FixItNR.Api.Data;
+﻿using System.Reflection;
+using System.IO;
+using FixItNR.Api.Data;
 using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Слушаем порт 8080 (Amvera)
+// Слушаем порт 8080 (нужно для Amvera/контейнера)
 builder.WebHost.UseUrls("http://0.0.0.0:8080");
 
+// ---------- Services ----------
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -15,31 +18,32 @@ builder.Services.AddSwaggerGen(c =>
         Title = "FixIt NR API",
         Version = "v1",
         Description = "Учебный веб-API регистрации заявок с расчётом SLA.",
-        Contact = new OpenApiContact { Name = "FixIt NR Team" },
-        License = new OpenApiLicense { Name = "MIT (учебный проект)" }
+        Contact = new OpenApiContact { Name = "FixIt NR Team" }
     });
 
-    // Подхватываем XML-комментарии (см. .csproj ниже)
-    var xml = Path.Combine(AppContext.BaseDirectory, "Project1.xml");
-    if (File.Exists(xml))
-        c.IncludeXmlComments(xml, includeControllerXmlComments: true);
+    // Подключаем XML-комментарии (если включена генерация в .csproj/свойствах)
+    var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+        c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
 });
 
-// In-memory репозиторий
+// In-memory репозиторий для ПР
 builder.Services.AddSingleton<ITicketRepository, InMemoryTicketRepository>();
 
 var app = builder.Build();
 
-// Swagger и в проде — для проверки в Amvera
+// ---------- Middleware ----------
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "FixIt NR API v1");
-    // c.RoutePrefix = "swagger"; // по умолчанию /swagger
+    // c.RoutePrefix = string.Empty; // если хочешь открыть Swagger на корне "/"
 });
 
-// Без внутреннего HTTPS в контейнере редирект не нужен
+// В контейнере HTTPS-редирект не нужен
 // app.UseHttpsRedirection();
 
 app.MapControllers();
+
 app.Run();
