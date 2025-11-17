@@ -2,6 +2,7 @@
 using System.IO;
 using FixItNR.Api.Data;
 using Microsoft.OpenApi.Models;
+using FixItNR.Api.Services;   // <— ДОБАВЬ
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +31,21 @@ builder.Services.AddSwaggerGen(c =>
 
 // In-memory репозиторий для ПР
 builder.Services.AddSingleton<ITicketRepository, InMemoryTicketRepository>();
+
+// --- НАСТРОЙКИ и HTTP-клиент к email-backend ---
+builder.Services.Configure<EmailApiOptions>(builder.Configuration.GetSection("EmailApi"));
+
+builder.Services.AddHttpClient<IEmailGateway, EmailGateway>((sp, client) =>
+{
+    var conf = sp.GetRequiredService<IConfiguration>();
+    var url = conf["EmailApi:NotifyUrl"]; // абсолютный https://<email-backend>.amvera.io/api/notify/email
+    // Можно не задавать BaseAddress и постить по абсолютному URL внутри клиента.
+    // Если хотите — раскомментируйте:
+    // if (!string.IsNullOrWhiteSpace(url)) client.BaseAddress = new Uri(url);
+
+    var timeout = int.TryParse(conf["EmailApi:TimeoutSeconds"], out var t) ? t : 10;
+    client.Timeout = TimeSpan.FromSeconds(timeout);
+});
 
 var app = builder.Build();
 
